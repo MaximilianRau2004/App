@@ -1,20 +1,27 @@
 package com.maxi.myfirstapp
 
 import android.os.Bundle
-import com.google.android.material.snackbar.Snackbar
-import androidx.appcompat.app.AppCompatActivity
-import androidx.navigation.findNavController
-import androidx.navigation.ui.AppBarConfiguration
-import androidx.navigation.ui.navigateUp
-import androidx.navigation.ui.setupActionBarWithNavController
-import android.view.Menu
+import android.text.InputType
+import android.view.ContextMenu
 import android.view.MenuItem
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.EditText
+import android.widget.ListView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.maxi.myfirstapp.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
+    private lateinit var lvTodoList: ListView
+    private lateinit var fab: FloatingActionButton
+    private lateinit var shoppingItems: ArrayList<String>
+    private lateinit var itemAdapter: ArrayAdapter<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,38 +29,98 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setSupportActionBar(binding.toolbar)
+        lvTodoList = findViewById(R.id.lvTodoList)
+        fab = findViewById(R.id.floatingActionButton)
+        shoppingItems = ArrayList()
 
-        val navController = findNavController(R.id.nav_host_fragment_content_main)
-        appBarConfiguration = AppBarConfiguration(navController.graph)
-        setupActionBarWithNavController(navController, appBarConfiguration)
+        // dummy data
+        shoppingItems.add("Apfel")
+        shoppingItems.add("Banane")
 
-        binding.fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                .setAction("Action", null)
-                .setAnchorView(R.id.fab).show()
+        itemAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, shoppingItems)
+        lvTodoList.adapter = itemAdapter
+
+        // register listView for context menu
+        registerForContextMenu(lvTodoList)
+
+        // Floating Action Button for adding elements
+        fab.setOnClickListener {
+            val builder = AlertDialog.Builder(this)
+            builder.setTitle("Hinzufügen")
+
+            val input = EditText(this)
+            input.hint = "Text eingeben"
+            input.inputType = InputType.TYPE_CLASS_TEXT
+            builder.setView(input)
+
+            builder.setPositiveButton("OK") { _, _ -> // dialog, which
+                val newItem = input.text.toString()
+                if (newItem.isNotBlank()) {
+                    shoppingItems.add(newItem)
+                    Toast.makeText(applicationContext, "Element hinzugefügt", Toast.LENGTH_SHORT).show()
+                    itemAdapter.notifyDataSetChanged()
+                }
+            }
+
+            builder.setNegativeButton("Abbrechen") { _, _ ->
+                Toast.makeText(applicationContext, "Abgebrochen", Toast.LENGTH_SHORT).show()
+            }
+
+            builder.show()
         }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        menuInflater.inflate(R.menu.menu_main, menu)
-        return true
+    // create context menu
+    override fun onCreateContextMenu(menu: ContextMenu?, v: View?, menuInfo: ContextMenu.ContextMenuInfo?) {
+        super.onCreateContextMenu(menu, v, menuInfo)
+        menuInflater.inflate(R.menu.context_menu, menu)  // context_menu.xml
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
+    // context menu for delete and rename
+    override fun onContextItemSelected(item: MenuItem): Boolean {
+        val info = item.menuInfo as AdapterView.AdapterContextMenuInfo
+        val position = info.position
+
         return when (item.itemId) {
-            R.id.action_settings -> true
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
+            R.id.menu_delete -> {
+                // confirm for delete
+                AlertDialog.Builder(this)
+                    .setTitle("Löschen bestätigen")
+                    .setMessage("Möchtest du dieses Element wirklich löschen?")
+                    .setPositiveButton("Ja") { _, _ ->
+                        shoppingItems.removeAt(position)
+                        itemAdapter.notifyDataSetChanged()
+                        Toast.makeText(applicationContext, "Element gelöscht", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("Abbrechen", null)
+                    .show()
+                true
+            }
 
-    override fun onSupportNavigateUp(): Boolean {
-        val navController = findNavController(R.id.nav_host_fragment_content_main)
-        return navController.navigateUp(appBarConfiguration)
-                || super.onSupportNavigateUp()
+            R.id.menu_rename -> {
+                // dialog for rename
+                val renameBuilder = AlertDialog.Builder(this)
+                renameBuilder.setTitle("Element umbenennen")
+
+                val input = EditText(this)
+                input.setText(shoppingItems[position])  // previous text as placeholder
+                renameBuilder.setView(input)
+
+                renameBuilder.setPositiveButton("OK") { _, _ ->
+                    val newName = input.text.toString()
+                    if (newName.isNotBlank()) {
+                        shoppingItems[position] = newName
+                        itemAdapter.notifyDataSetChanged()
+                        Toast.makeText(applicationContext, "Element umbenannt", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                renameBuilder.setNegativeButton("Abbrechen", null)
+                renameBuilder.show()
+                true
+            }
+
+            else -> super.onContextItemSelected(item)
+        }
     }
 }
